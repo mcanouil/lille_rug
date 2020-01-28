@@ -1,0 +1,170 @@
+---
+title: 'Lille - R User Group'
+author: "Mickaël Canouil, *Ph.D.*"
+date: '`r format(Sys.time(), "%d %B %Y")`'
+output: 
+  flexdashboard::flex_dashboard:
+    logo: logo.png
+    orientation: rows
+    vertical_layout: fill
+    theme: cerulean
+    social: [ "twitter", "facebook" ]
+    fig_width: 6.3
+    fig_height: 4.7
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+options(stringsAsFactors = FALSE)
+
+### Load packages
+library(tidyverse)
+library(readxl)
+library(gganimate)
+library(flexdashboard)
+
+source("https://github.com/mcanouil/DEV/raw/master/R/theme_black.R")
+
+theme_set(theme_black(base_size = 16))
+# knitr::opts_chunk$set(autodep = TRUE, cache = TRUE)
+```
+
+```{r data}
+survey_data <- readxl::read_xlsx(path = "data/survey_data.xlsx") %>% 
+  dplyr::mutate(id = Horodateur) %>% 
+  dplyr::group_by(id) %>% 
+  dplyr::slice(dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate_at(
+    .vars = vars(`Connaissez-vous R ?`, `Vous voulez en faire ?`, `Vous savez déjà en faire ?`),
+    .funs = ~factor(c("Oui" = "yes", "Non" = "no")[.x], levels = c("no", "yes"))
+  ) %>% 
+  dplyr::rename(
+    meeting_location = `Pour en discuter, vous préféreriez le faire :`,
+    meeting_time = `Pour une première réunion, vous souhaiteriez qu'elle se déroule :`
+  ) %>% 
+  dplyr::mutate(
+    meeting_location = purrr::map_chr(
+      .x = meeting_location, 
+      .f = ~switch(.x,
+        "bar ou restaurant" = "Both",
+        "Les deux" = "Both",
+        "Tout me va" = "Both",
+        "pas de préférence" = "Both",
+        "Dans une salle de réunion" = "Meeting Room",
+        "Salle de réunion avec script projetté" = "Meeting Room",
+        "Dans un bar" = "Pub"
+      )
+    ),
+    meeting_time = purrr::map_chr(
+      .x = meeting_time, 
+      .f = ~switch(.x,
+        "Un soir en semaine" = "Evening", 
+        "Un midi en semaine (par exemple un vendredi entre 12h et 13h30)" = "Lunch Break", 
+        "un jour ouvré entre 9h30-11h00 ou 14h30-16h00 ou 15h00-16h30" = "Working Hours ", 
+        "Tout me va" = "Any", 
+        "Un midi en semaine (pas le mardi et pas le jeudi)" = "Lunch Break"
+      )
+    )
+  ) %>% 
+  dplyr::arrange(Horodateur)
+```
+
+# Survey Results 
+
+## Row {data-height=150}
+
+### Participants (unique)
+
+```{r}
+flexdashboard::valueBox(
+  value = nrow(survey_data), 
+  icon = "fa-users",
+  color = "primary"
+)
+```
+
+### Know what R is
+
+```{r}
+flexdashboard::valueBox(
+  value = sum(survey_data[["Connaissez-vous R ?"]]=="yes"), 
+  icon = "fa-code",
+  color = "primary"
+)
+```
+
+### Want to know how to use R
+
+```{r}
+flexdashboard::valueBox(
+  value = sum(survey_data[["Vous voulez en faire ?"]]=="yes"), 
+  icon = "fa-info",
+  color = "primary"
+)
+```
+
+### Already use R
+
+```{r}
+flexdashboard::valueBox(
+  value = sum(survey_data[["Vous savez déjà en faire ?"]]=="yes"), 
+  icon = "fa-thumbs-up",
+  color = "primary"
+)
+```
+
+
+
+## Row {data-height=850}
+
+### Reply over time
+
+```{r, eval = FALSE}
+gganimate::animate(
+  plot = ggplot2::ggplot(
+      data = dplyr::mutate(survey_data, n = 1:dplyr::n()), 
+      mapping = ggplot2::aes(x = Horodateur, y = n)
+    ) +
+      ggplot2::geom_line(size = 1.5) +
+      ggplot2::geom_point(
+        mapping = ggplot2::aes(fill = n, group = seq_along(Horodateur)),
+        colour = "white", 
+        shape = 21,
+        size = 3
+      ) +
+      ggplot2::labs(x = "Time", y = "Cumulative number of participants") +
+      ggplot2::scale_colour_viridis_c(end = 0.95) +
+      ggplot2::theme(legend.position = "none") +
+      gganimate::transition_reveal(along = Horodateur),
+  width = 6.3,
+  height = 4.7,
+  units = "in", 
+  res = 300,
+  bg = ggplot2::theme_get()$plot.background$colour,
+  renderer = gganimate::gifski_renderer()
+)
+```
+
+### Meeting 
+
+```{r}
+survey_data %>% 
+  dplyr::count(meeting_time, meeting_location) %>% 
+  tidyr::complete(meeting_time, meeting_location, fill = list(n = 0)) %>% 
+  ggplot2::ggplot(
+    mapping = ggplot2::aes(x = meeting_time, y = meeting_location)
+  ) +
+    ggplot2::geom_tile(mapping = ggplot2::aes(fill = n)) +
+    ggplot2::geom_text(mapping = ggplot2::aes(label = n), size = 10) +
+    ggplot2::labs(x = "Meeting Time", y = "Meeting Location", fill = "Count") +
+    ggplot2::scale_fill_viridis_c(end = 0.95) +
+    ggplot2::scale_x_discrete(expand = c(0, 0)) +
+    ggplot2::scale_y_discrete(expand = c(0, 0)) +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(), 
+      panel.border = ggplot2::element_blank(), 
+      legend.position = "none"
+    )
+```
