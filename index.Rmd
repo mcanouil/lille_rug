@@ -30,7 +30,7 @@ theme_set(theme_black(base_size = 16))
 # knitr::opts_chunk$set(autodep = TRUE, cache = TRUE)
 ```
 
-```{r data}
+```{r data, eval = !file.exists("data/survey_data.rds")}
 survey_data <- readxl::read_xlsx(path = "data/survey_data.xlsx") %>% 
   dplyr::mutate(id = Horodateur) %>% 
   dplyr::group_by(id) %>% 
@@ -68,8 +68,14 @@ survey_data <- readxl::read_xlsx(path = "data/survey_data.xlsx") %>%
       )
     )
   ) %>% 
-  dplyr::arrange(Horodateur)
+  dplyr::arrange(Horodateur) %>% 
+  readr::write_rds("data/survey_data.rds")
 ```
+
+```{r load-data}
+survey_data <- readr::read_rds("data/survey_data.rds")
+```
+
 
 # Survey Results 
 
